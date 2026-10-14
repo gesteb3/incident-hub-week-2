@@ -12,6 +12,7 @@ services:
       - incident_hub_postgres_data:/var/lib/postgresql/data
       - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
       - ./database/seeds/001_categories.sql:/docker-entrypoint-initdb.d/002_categories.sql:ro
+      - ./database/seeds/002_users.sql:/docker-entrypoint-initdb.d/003_users.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
