@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../errors/app-error.js';
 import type {
   CreateIncidentInput,
+  AssignTechnicianInput,
   ListIncidentsInput,
 } from '../schemas/incident.schema.js';
 
@@ -92,4 +93,68 @@ export async function getIncidentHistory(id: string) {
       },
     },
   });
+}
+
+export async function assignTechnician(id: string, input: AssignTechnicianInput) {
+  const [incident, technician, actor] = await Promise.all([
+    prisma.incident.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    }),
+    prisma.user.findFirst({
+      where: {
+        id: input.technicianId,
+        active: true,
+        role: { in: ['TECHNICIAN', 'ADMIN'] },
+      },
+      select: { id: true, name: true },
+    }),
+    prisma.user.findFirst({
+      where: {
+        id: input.actorId,
+        active: true,
+        role: { in: ['TECHNICIAN', 'ADMIN'] },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!incident) {
+    throw new AppError(404, 'INCIDENT_NOT_FOUND', 'El incidente no existe');
+  }
+
+  if (!technician) {
+    throw new AppError(404, 'TECHNICIAN_NOT_FOUND', 'El técnico no existe o está inactivo');
+  }
+
+  if (!actor) {
+    throw new AppError(403, 'ACTOR_NOT_AUTHORIZED', 'El usuario no puede asignar técnicos');
+  }
+
+  const newStatus = incident.status === 'NUEVO' ? 'ASIGNADO' : incident.status;
+  const [updatedIncident] = await prisma.$transaction([
+    prisma.incident.update({
+      where: { id },
+      data: {
+        technicianId: technician.id,
+        status: newStatus,
+      },
+      include: incidentSummaryInclude,
+    }),
+    prisma.incidentHistory.create({
+      data: {
+        incidentId: id,
+        actorId: actor.id,
+        eventType: 'ASSIGNED',
+        previousStatus: incident.status,
+        newStatus,
+        details: {
+          technicianId: technician.id,
+          technicianName: technician.name,
+        },
+      },
+    }),
+  ]);
+
+  return updatedIncident;
 }

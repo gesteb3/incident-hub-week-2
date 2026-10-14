@@ -9,9 +9,10 @@ const prismaMock = vi.hoisted(() => ({
     create: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn(),
+    update: vi.fn(),
     count: vi.fn(),
   },
-  incidentHistory: { findMany: vi.fn() },
+  incidentHistory: { findMany: vi.fn(), create: vi.fn() },
   $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   $disconnect: vi.fn(),
 }));
@@ -152,5 +153,55 @@ describe('GET /api/incidents', () => {
         orderBy: { createdAt: 'asc' },
       }),
     );
+  });
+});
+
+describe('PATCH /api/incidents/:id/assignment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation((operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    );
+  });
+
+  it('asigna un técnico y cambia un incidente NUEVO a ASIGNADO', async () => {
+    const incidentId = randomUUID();
+    const technicianId = randomUUID();
+    const actorId = randomUUID();
+    prismaMock.incident.findUnique.mockResolvedValue({ id: incidentId, status: 'NUEVO' });
+    prismaMock.user.findFirst
+      .mockResolvedValueOnce({ id: technicianId, name: 'Técnico de Soporte' })
+      .mockResolvedValueOnce({ id: actorId });
+    prismaMock.incident.update.mockResolvedValue({
+      id: incidentId,
+      technicianId,
+      status: 'ASIGNADO',
+    });
+    prismaMock.incidentHistory.create.mockResolvedValue({ id: randomUUID() });
+
+    const response = await request(app)
+      .patch(`/api/incidents/${incidentId}/assignment`)
+      .send({ technicianId, actorId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({ technicianId, status: 'ASIGNADO' });
+    expect(prismaMock.incidentHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ eventType: 'ASSIGNED', newStatus: 'ASIGNADO' }),
+      }),
+    );
+  });
+
+  it('rechaza la asignación cuando el técnico no es válido', async () => {
+    prismaMock.incident.findUnique.mockResolvedValue({ id: randomUUID(), status: 'NUEVO' });
+    prismaMock.user.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: randomUUID() });
+
+    const response = await request(app)
+      .patch(`/api/incidents/${randomUUID()}/assignment`)
+      .send({ technicianId: randomUUID(), actorId: randomUUID() });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('TECHNICIAN_NOT_FOUND');
+    expect(prismaMock.incident.update).not.toHaveBeenCalled();
   });
 });

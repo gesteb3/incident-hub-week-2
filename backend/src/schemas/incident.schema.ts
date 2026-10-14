@@ -25,4 +25,15 @@ export const incidentIdSchema = z.object({
   }),
 });
 
+export const assignTechnicianSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+  }),
+  body: z.object({
+    technicianId: z.string().uuid(),
+    actorId: z.string().uuid(),
+  }),
+});
+
 export type ListIncidentsInput = z.infer<typeof listIncidentsSchema>['query'];
+export type AssignTechnicianInput = z.infer<typeof assignTechnicianSchema>['body'];

@@ -1,11 +1,13 @@
 import type { NextFunction, Request, Response } from 'express';
 import {
   createIncidentSchema,
+  assignTechnicianSchema,
   incidentIdSchema,
   listIncidentsSchema,
 } from '../schemas/incident.schema.js';
 import {
   createIncident,
+  assignTechnician,
   getIncidentById,
   getIncidentHistory,
   listIncidents,
@@ -21,6 +23,23 @@ export async function createIncidentController(
     const incident = await createIncident(body);
 
     response.status(201).json({ data: incident });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function assignTechnicianController(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  try {
+    const { params, body } = assignTechnicianSchema.parse({
+      params: request.params,
+      body: request.body,
+    });
+    const incident = await assignTechnician(params.id, body);
+    response.status(200).json({ data: incident });
   } catch (error) {
     next(error);
   }
