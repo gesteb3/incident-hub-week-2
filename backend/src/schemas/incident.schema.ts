@@ -11,3 +11,18 @@ export const createIncidentSchema = z.object({
 });
 
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>['body'];
+
+export const listIncidentsSchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+  }),
+});
+
+export const incidentIdSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+  }),
+});
+
+export type ListIncidentsInput = z.infer<typeof listIncidentsSchema>['query'];

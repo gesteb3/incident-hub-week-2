@@ -5,7 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const prismaMock = vi.hoisted(() => ({
   user: { findFirst: vi.fn() },
   category: { findFirst: vi.fn() },
-  incident: { create: vi.fn() },
+  incident: {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    count: vi.fn(),
+  },
+  $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   $disconnect: vi.fn(),
 }));
 
@@ -78,5 +84,45 @@ describe('POST /api/incidents', () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('REPORTER_NOT_FOUND');
+  });
+});
+
+describe('GET /api/incidents', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation((operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    );
+  });
+
+  it('lista incidentes con paginación', async () => {
+    const incidents = [{ id: randomUUID(), title: 'Equipo sin acceso', status: 'NUEVO' }];
+    prismaMock.incident.findMany.mockResolvedValue(incidents);
+    prismaMock.incident.count.mockResolvedValue(1);
+
+    const response = await request(app).get('/api/incidents?page=1&limit=10');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(incidents);
+    expect(response.body.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
+  });
+
+  it('consulta el detalle de un incidente', async () => {
+    const incident = { id: randomUUID(), title: 'Equipo sin acceso', status: 'NUEVO' };
+    prismaMock.incident.findUnique.mockResolvedValue(incident);
+
+    const response = await request(app).get(`/api/incidents/${incident.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(incident);
+  });
+
+  it('responde 404 cuando el incidente no existe', async () => {
+    prismaMock.incident.findUnique.mockResolvedValue(null);
+
+    const response = await request(app).get(`/api/incidents/${randomUUID()}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('INCIDENT_NOT_FOUND');
   });
 });
