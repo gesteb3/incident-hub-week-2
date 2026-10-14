@@ -1,20 +1,31 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# IT Incident Hub
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+Sistema web trazable para registrar, operar y dar seguimiento a incidentes de TI.
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+## Estado
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+Semana 1 - modelo de datos y módulos funcionales iniciales.
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+## Arquitectura
+
+- `backend/`: API REST con Node.js, Express y TypeScript.
+- `frontend/`: aplicación web con React y TypeScript.
+- `database/`: migraciones y datos iniciales de PostgreSQL.
+- `tests/`: pruebas de integración y extremo a extremo.
+- `devops/`: recursos de automatización y despliegue.
+- `docs/`: documentación técnica y evidencias verificables.
+
+## Base de datos local
+
+1. Copia `.env.example` como `.env` y cambia sus valores locales.
+2. Inicia PostgreSQL:
+
+```bash
+docker compose up -d database
+```
+
+La migración y los datos iniciales se aplican automáticamente al crear el volumen por primera vez.
+
+## Trazabilidad
+
+El trabajo se realiza en ramas `feature/*`, `fix/*` o `refactor/*`. Los commits y Pull Requests deben incluir el identificador de Azure Boards con la sintaxis `AB#ID`.

@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  REQUESTER
+  TECHNICIAN
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum IncidentPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@map("incident_priority")
+}
+
+enum IncidentStatus {
+  NUEVO
+  ASIGNADO
+  EN_PROCESO
+  RESUELTO
+  CERRADO
+
+  @@map("incident_status")
+}
+
+enum HistoryEventType {
+  CREATED
+  ASSIGNED
+  STATUS_CHANGED
+  COMMENTED
+  UPDATED
+
+  @@map("history_event_type")
+}
+
+model User {
+  id                String            @id @default(uuid()) @db.Uuid
+  name              String            @db.VarChar(120)
+  email             String            @unique @db.VarChar(254)
+  role              UserRole          @default(REQUESTER)
+  active            Boolean           @default(true)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reportedIncidents Incident[]        @relation("IncidentReporter")
+  assignedIncidents Incident[]        @relation("IncidentTechnician")
+  comments          IncidentComment[]
+  historyEvents     IncidentHistory[]
+
+  @@map("users")
+}
+
+model Category {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique @db.VarChar(80)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  incidents Incident[]
+
+  @@map("categories")
+}
+
+model Incident {
+  id           String             @id @default(uuid()) @db.Uuid
+  title        String             @db.VarChar(160)
+  description  String             @db.Text
+  priority     IncidentPriority
+  status       IncidentStatus     @default(NUEVO)
+  reporterId   String             @map("reporter_id") @db.Uuid
+  technicianId String?            @map("technician_id") @db.Uuid
+  categoryId   String             @map("category_id") @db.Uuid
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  resolvedAt   DateTime?          @map("resolved_at") @db.Timestamptz(6)
+  closedAt     DateTime?          @map("closed_at") @db.Timestamptz(6)
+  reporter     User               @relation("IncidentReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  technician   User?              @relation("IncidentTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  category     Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  comments     IncidentComment[]
+  history      IncidentHistory[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([categoryId])
+  @@index([technicianId])
+  @@index([createdAt])
+  @@map("incidents")
+}
+
+model IncidentComment {
+  id         String   @id @default(uuid()) @db.Uuid
+  incidentId String   @map("incident_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  content    String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([incidentId, createdAt])
+  @@map("incident_comments")
+}
+
+model IncidentHistory {
+  id             String           @id @default(uuid()) @db.Uuid
+  incidentId     String           @map("incident_id") @db.Uuid
+  actorId        String?          @map("actor_id") @db.Uuid
+  eventType      HistoryEventType @map("event_type")
+  previousStatus IncidentStatus?  @map("previous_status")
+  newStatus      IncidentStatus?  @map("new_status")
+  details        Json?            @db.JsonB
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  incident       Incident         @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  actor          User?            @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId, createdAt])
+  @@map("incident_history")
+}
