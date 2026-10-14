@@ -72,3 +72,24 @@ export async function getIncidentById(id: string) {
 
   return incident;
 }
+
+export async function getIncidentHistory(id: string) {
+  const incidentExists = await prisma.incident.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!incidentExists) {
+    throw new AppError(404, 'INCIDENT_NOT_FOUND', 'El incidente no existe');
+  }
+
+  return prisma.incidentHistory.findMany({
+    where: { incidentId: id },
+    orderBy: { createdAt: 'asc' },
+    include: {
+      actor: {
+        select: { id: true, name: true, role: true },
+      },
+    },
+  });
+}

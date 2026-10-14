@@ -7,6 +7,7 @@ import {
 import {
   createIncident,
   getIncidentById,
+  getIncidentHistory,
   listIncidents,
 } from '../services/incident.service.js';
 
@@ -20,6 +21,20 @@ export async function createIncidentController(
     const incident = await createIncident(body);
 
     response.status(201).json({ data: incident });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getIncidentHistoryController(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  try {
+    const { params } = incidentIdSchema.parse({ params: request.params });
+    const history = await getIncidentHistory(params.id);
+    response.status(200).json({ data: history });
   } catch (error) {
     next(error);
   }

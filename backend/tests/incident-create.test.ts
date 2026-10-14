@@ -11,6 +11,7 @@ const prismaMock = vi.hoisted(() => ({
     findUnique: vi.fn(),
     count: vi.fn(),
   },
+  incidentHistory: { findMany: vi.fn() },
   $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   $disconnect: vi.fn(),
 }));
@@ -124,5 +125,32 @@ describe('GET /api/incidents', () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('INCIDENT_NOT_FOUND');
+  });
+
+  it('devuelve el historial cronológico del incidente', async () => {
+    const incidentId = randomUUID();
+    const history = [
+      {
+        id: randomUUID(),
+        incidentId,
+        eventType: 'CREATED',
+        previousStatus: null,
+        newStatus: 'NUEVO',
+        actor: { id: randomUUID(), name: 'Usuario Solicitante', role: 'REQUESTER' },
+      },
+    ];
+    prismaMock.incident.findUnique.mockResolvedValue({ id: incidentId });
+    prismaMock.incidentHistory.findMany.mockResolvedValue(history);
+
+    const response = await request(app).get(`/api/incidents/${incidentId}/history`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(history);
+    expect(prismaMock.incidentHistory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { incidentId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    );
   });
 });
