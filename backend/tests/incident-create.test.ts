@@ -205,3 +205,91 @@ describe('PATCH /api/incidents/:id/assignment', () => {
     expect(prismaMock.incident.update).not.toHaveBeenCalled();
   });
 });
+
+describe('PATCH /api/incidents/:id/status', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation((operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    );
+  });
+
+  it('cambia un incidente ASIGNADO a EN_PROCESO y registra el historial', async () => {
+    const incidentId = randomUUID();
+    const actorId = randomUUID();
+    prismaMock.incident.findUnique.mockResolvedValue({
+      id: incidentId,
+      status: 'ASIGNADO',
+      technicianId: randomUUID(),
+    });
+    prismaMock.user.findFirst.mockResolvedValue({ id: actorId });
+    prismaMock.incident.update.mockResolvedValue({ id: incidentId, status: 'EN_PROCESO' });
+    prismaMock.incidentHistory.create.mockResolvedValue({ id: randomUUID() });
+
+    const response = await request(app)
+      .patch(`/api/incidents/${incidentId}/status`)
+      .send({ status: 'EN_PROCESO', actorId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe('EN_PROCESO');
+    expect(prismaMock.incidentHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: 'STATUS_CHANGED',
+          previousStatus: 'ASIGNADO',
+          newStatus: 'EN_PROCESO',
+        }),
+      }),
+    );
+  });
+
+  it('rechaza saltos de estado no permitidos', async () => {
+    prismaMock.incident.findUnique.mockResolvedValue({
+      id: randomUUID(),
+      status: 'NUEVO',
+      technicianId: null,
+    });
+    prismaMock.user.findFirst.mockResolvedValue({ id: randomUUID() });
+
+    const response = await request(app)
+      .patch(`/api/incidents/${randomUUID()}/status`)
+      .send({
+        status: 'RESUELTO',
+        actorId: randomUUID(),
+        reason: 'El incidente fue solucionado correctamente',
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('INVALID_STATUS_TRANSITION');
+    expect(prismaMock.incident.update).not.toHaveBeenCalled();
+  });
+
+  it('impide que un usuario no autorizado cambie estados', async () => {
+    prismaMock.incident.findUnique.mockResolvedValue({
+      id: randomUUID(),
+      status: 'ASIGNADO',
+      technicianId: randomUUID(),
+    });
+    prismaMock.user.findFirst.mockResolvedValue(null);
+
+    const response = await request(app)
+      .patch(`/api/incidents/${randomUUID()}/status`)
+      .send({ status: 'EN_PROCESO', actorId: randomUUID() });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('ACTOR_NOT_AUTHORIZED');
+  });
+
+  it('exige un motivo para resolver un incidente', async () => {
+    const response = await request(app)
+      .patch(`/api/incidents/${randomUUID()}/status`)
+      .send({ status: 'RESUELTO', actorId: randomUUID() });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details.fieldErrors.body).toContain(
+      'El motivo es obligatorio para resolver o cerrar un incidente',
+    );
+    expect(prismaMock.incident.update).not.toHaveBeenCalled();
+  });
+});

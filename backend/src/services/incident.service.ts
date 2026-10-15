@@ -1,8 +1,10 @@
 import { prisma } from '../lib/prisma.js';
+import { IncidentStatus } from '@prisma/client';
 import { AppError } from '../errors/app-error.js';
 import type {
   CreateIncidentInput,
   AssignTechnicianInput,
+  ChangeIncidentStatusInput,
   ListIncidentsInput,
 } from '../schemas/incident.schema.js';
 
@@ -11,6 +13,14 @@ const incidentSummaryInclude = {
   category: { select: { id: true, name: true } },
   technician: { select: { id: true, name: true, email: true } },
 } as const;
+
+const allowedStatusTransitions: Record<IncidentStatus, IncidentStatus[]> = {
+  NUEVO: ['ASIGNADO'],
+  ASIGNADO: ['EN_PROCESO'],
+  EN_PROCESO: ['RESUELTO'],
+  RESUELTO: ['CERRADO'],
+  CERRADO: [],
+};
 
 export async function createIncident(input: CreateIncidentInput) {
   const [reporter, category] = await Promise.all([
@@ -151,6 +161,78 @@ export async function assignTechnician(id: string, input: AssignTechnicianInput)
         details: {
           technicianId: technician.id,
           technicianName: technician.name,
+        },
+      },
+    }),
+  ]);
+
+  return updatedIncident;
+}
+
+export async function changeIncidentStatus(id: string, input: ChangeIncidentStatusInput) {
+  const [incident, actor] = await Promise.all([
+    prisma.incident.findUnique({
+      where: { id },
+      select: { id: true, status: true, technicianId: true },
+    }),
+    prisma.user.findFirst({
+      where: {
+        id: input.actorId,
+        active: true,
+        role: { in: ['TECHNICIAN', 'ADMIN'] },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!incident) {
+    throw new AppError(404, 'INCIDENT_NOT_FOUND', 'El incidente no existe');
+  }
+
+  if (!actor) {
+    throw new AppError(403, 'ACTOR_NOT_AUTHORIZED', 'El usuario no puede cambiar estados');
+  }
+
+  const targetStatus = input.status as IncidentStatus;
+  const allowedTargets = allowedStatusTransitions[incident.status];
+  if (!allowedTargets.includes(targetStatus)) {
+    throw new AppError(
+      409,
+      'INVALID_STATUS_TRANSITION',
+      `No se permite cambiar de ${incident.status} a ${targetStatus}`,
+    );
+  }
+
+  if (targetStatus === 'ASIGNADO' && !incident.technicianId) {
+    throw new AppError(
+      409,
+      'TECHNICIAN_REQUIRED',
+      'Debe asignarse un técnico antes de cambiar a ASIGNADO',
+    );
+  }
+
+  const timestampChanges = {
+    ...(targetStatus === 'RESUELTO' ? { resolvedAt: new Date() } : {}),
+    ...(targetStatus === 'CERRADO' ? { closedAt: new Date() } : {}),
+  };
+
+  const [updatedIncident] = await prisma.$transaction([
+    prisma.incident.update({
+      where: { id },
+      data: { status: targetStatus, ...timestampChanges },
+      include: incidentSummaryInclude,
+    }),
+    prisma.incidentHistory.create({
+      data: {
+        incidentId: id,
+        actorId: actor.id,
+        eventType: 'STATUS_CHANGED',
+        previousStatus: incident.status,
+        newStatus: targetStatus,
+        details: {
+          from: incident.status,
+          to: targetStatus,
+          ...(input.reason ? { reason: input.reason } : {}),
         },
       },
     }),

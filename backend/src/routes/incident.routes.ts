@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createIncidentController,
   assignTechnicianController,
+  changeIncidentStatusController,
   getIncidentByIdController,
   getIncidentHistoryController,
   listIncidentsController,
@@ -14,3 +15,4 @@ incidentRouter.get('/:id/history', getIncidentHistoryController);
 incidentRouter.get('/:id', getIncidentByIdController);
 incidentRouter.post('/', createIncidentController);
 incidentRouter.patch('/:id/assignment', assignTechnicianController);
+incidentRouter.patch('/:id/status', changeIncidentStatusController);
