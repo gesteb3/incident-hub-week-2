@@ -25,6 +25,22 @@ export const incidentIdSchema = z.object({
   }),
 });
 
+export const createIncidentCommentSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  body: z.object({
+    authorId: z.string().uuid(),
+    content: z.string().trim().min(1).max(2000),
+  }),
+});
+
+export const listIncidentCommentsSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  query: z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+  }),
+});
+
 export const assignTechnicianSchema = z.object({
   params: z.object({
     id: z.string().uuid(),
@@ -59,3 +75,5 @@ export const changeIncidentStatusSchema = z.object({
 export type ListIncidentsInput = z.infer<typeof listIncidentsSchema>['query'];
 export type AssignTechnicianInput = z.infer<typeof assignTechnicianSchema>['body'];
 export type ChangeIncidentStatusInput = z.infer<typeof changeIncidentStatusSchema>['body'];
+export type CreateIncidentCommentInput = z.infer<typeof createIncidentCommentSchema>['body'];
+export type ListIncidentCommentsInput = z.infer<typeof listIncidentCommentsSchema>['query'];

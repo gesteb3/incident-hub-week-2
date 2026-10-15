@@ -6,6 +6,8 @@ import type {
   AssignTechnicianInput,
   ChangeIncidentStatusInput,
   ListIncidentsInput,
+  CreateIncidentCommentInput,
+  ListIncidentCommentsInput,
 } from '../schemas/incident.schema.js';
 
 const incidentSummaryInclude = {
@@ -103,6 +105,69 @@ export async function getIncidentHistory(id: string) {
       },
     },
   });
+}
+
+export async function listIncidentComments(id: string, input: ListIncidentCommentsInput) {
+  const incidentExists = await prisma.incident.findUnique({ where: { id }, select: { id: true } });
+  if (!incidentExists) {
+    throw new AppError(404, 'INCIDENT_NOT_FOUND', 'El incidente no existe');
+  }
+
+  const skip = (input.page - 1) * input.limit;
+  const [items, total] = await prisma.$transaction([
+    prisma.incidentComment.findMany({
+      where: { incidentId: id },
+      skip,
+      take: input.limit,
+      orderBy: { createdAt: 'asc' },
+      include: { author: { select: { id: true, name: true, role: true } } },
+    }),
+    prisma.incidentComment.count({ where: { incidentId: id } }),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page: input.page,
+      limit: input.limit,
+      total,
+      totalPages: Math.ceil(total / input.limit),
+    },
+  };
+}
+
+export async function createIncidentComment(id: string, input: CreateIncidentCommentInput) {
+  const [incident, author] = await Promise.all([
+    prisma.incident.findUnique({ where: { id }, select: { id: true } }),
+    prisma.user.findFirst({
+      where: { id: input.authorId, active: true },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!incident) {
+    throw new AppError(404, 'INCIDENT_NOT_FOUND', 'El incidente no existe');
+  }
+  if (!author) {
+    throw new AppError(404, 'AUTHOR_NOT_FOUND', 'El autor no existe o está inactivo');
+  }
+
+  const [comment] = await prisma.$transaction([
+    prisma.incidentComment.create({
+      data: { incidentId: id, authorId: author.id, content: input.content },
+      include: { author: { select: { id: true, name: true, role: true } } },
+    }),
+    prisma.incidentHistory.create({
+      data: {
+        incidentId: id,
+        actorId: author.id,
+        eventType: 'COMMENTED',
+        details: { content: input.content },
+      },
+    }),
+  ]);
+
+  return comment;
 }
 
 export async function assignTechnician(id: string, input: AssignTechnicianInput) {

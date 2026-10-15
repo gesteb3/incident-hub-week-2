@@ -5,6 +5,8 @@ import {
   changeIncidentStatusSchema,
   incidentIdSchema,
   listIncidentsSchema,
+  createIncidentCommentSchema,
+  listIncidentCommentsSchema,
 } from '../schemas/incident.schema.js';
 import {
   createIncident,
@@ -13,6 +15,8 @@ import {
   getIncidentById,
   getIncidentHistory,
   listIncidents,
+  createIncidentComment,
+  listIncidentComments,
 } from '../services/incident.service.js';
 
 export async function createIncidentController(
@@ -73,6 +77,40 @@ export async function getIncidentHistoryController(
     const { params } = incidentIdSchema.parse({ params: request.params });
     const history = await getIncidentHistory(params.id);
     response.status(200).json({ data: history });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listIncidentCommentsController(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  try {
+    const { params, query } = listIncidentCommentsSchema.parse({
+      params: request.params,
+      query: request.query,
+    });
+    const result = await listIncidentComments(params.id, query);
+    response.status(200).json({ data: result.items, meta: result.pagination });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createIncidentCommentController(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  try {
+    const { params, body } = createIncidentCommentSchema.parse({
+      params: request.params,
+      body: request.body,
+    });
+    const comment = await createIncidentComment(params.id, body);
+    response.status(201).json({ data: comment });
   } catch (error) {
     next(error);
   }

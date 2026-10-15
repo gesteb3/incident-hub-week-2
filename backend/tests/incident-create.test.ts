@@ -13,6 +13,7 @@ const prismaMock = vi.hoisted(() => ({
     count: vi.fn(),
   },
   incidentHistory: { findMany: vi.fn(), create: vi.fn() },
+  incidentComment: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
   $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   $disconnect: vi.fn(),
 }));
@@ -153,6 +154,89 @@ describe('GET /api/incidents', () => {
         orderBy: { createdAt: 'asc' },
       }),
     );
+  });
+});
+
+describe('Comentarios de incidentes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation((operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    );
+  });
+
+  it('registra un comentario y crea el evento correspondiente en la bitácora', async () => {
+    const incidentId = randomUUID();
+    const authorId = randomUUID();
+    const comment = {
+      id: randomUUID(),
+      incidentId,
+      authorId,
+      content: 'Se verificó la conexión del usuario.',
+      author: { id: authorId, name: 'Técnico', role: 'TECHNICIAN' },
+    };
+    prismaMock.incident.findUnique.mockResolvedValue({ id: incidentId });
+    prismaMock.user.findFirst.mockResolvedValue({ id: authorId });
+    prismaMock.incidentComment.create.mockResolvedValue(comment);
+    prismaMock.incidentHistory.create.mockResolvedValue({ id: randomUUID() });
+
+    const response = await request(app)
+      .post(`/api/incidents/${incidentId}/comments`)
+      .send({ authorId, content: comment.content });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual(comment);
+    expect(prismaMock.incidentHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          incidentId,
+          actorId: authorId,
+          eventType: 'COMMENTED',
+        }),
+      }),
+    );
+  });
+
+  it('lista comentarios cronológicamente con paginación', async () => {
+    const incidentId = randomUUID();
+    const comments = [{ id: randomUUID(), incidentId, content: 'Seguimiento' }];
+    prismaMock.incident.findUnique.mockResolvedValue({ id: incidentId });
+    prismaMock.incidentComment.findMany.mockResolvedValue(comments);
+    prismaMock.incidentComment.count.mockResolvedValue(1);
+
+    const response = await request(app).get(`/api/incidents/${incidentId}/comments?page=1&limit=10`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(comments);
+    expect(response.body.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
+    expect(prismaMock.incidentComment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { incidentId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    );
+  });
+
+  it('rechaza un comentario vacío', async () => {
+    const response = await request(app)
+      .post(`/api/incidents/${randomUUID()}/comments`)
+      .send({ authorId: randomUUID(), content: '   ' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prismaMock.incidentComment.create).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 si el incidente no existe al registrar comentario', async () => {
+    prismaMock.incident.findUnique.mockResolvedValue(null);
+    prismaMock.user.findFirst.mockResolvedValue({ id: randomUUID() });
+
+    const response = await request(app)
+      .post(`/api/incidents/${randomUUID()}/comments`)
+      .send({ authorId: randomUUID(), content: 'Se inició revisión técnica.' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('INCIDENT_NOT_FOUND');
   });
 });
 
