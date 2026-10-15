@@ -26,6 +26,19 @@ docker compose up -d database
 
 La migración y los datos iniciales se aplican automáticamente al crear el volumen por primera vez.
 
+## Interfaz web local
+
+Con la API disponible en `http://localhost:3000`, inicia la interfaz en otra terminal:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+Abre `http://localhost:5173`. La interfaz obtiene incidentes y comentarios desde la API; los comentarios nuevos también quedan en la bitácora.
+
 ## Trazabilidad
 
 El trabajo se realiza en ramas `feature/*`, `fix/*` o `refactor/*`. Los commits y Pull Requests deben incluir el identificador de Azure Boards con la sintaxis `AB#ID`.
