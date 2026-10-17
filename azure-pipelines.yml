@@ -88,6 +88,10 @@ stages:
             displayName: 'Restaurar dependencias del frontend'
             workingDirectory: frontend
 
+          - script: npm run prisma:generate
+            displayName: 'Generar cliente Prisma para empaquetado'
+            workingDirectory: backend
+
           - script: npm run build
             displayName: 'Construir backend para artefacto'
             workingDirectory: backend
