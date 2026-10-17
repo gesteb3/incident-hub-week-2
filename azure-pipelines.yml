@@ -1,0 +1,118 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  NODE_VERSION: '22.x'
+  artifactName: 'it-incident-hub-drop'
+
+stages:
+  - stage: Validate
+    displayName: 'Validar y probar'
+    jobs:
+      - job: Validate
+        displayName: 'Backend y frontend'
+        pool:
+          name: Default
+        steps:
+          - checkout: self
+            displayName: 'Checkout del repositorio'
+
+          - task: NodeTool@0
+            displayName: 'Instalar Node.js $(NODE_VERSION)'
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+
+          - script: npm ci
+            displayName: 'Instalar dependencias del backend'
+            workingDirectory: backend
+
+          - script: npm ci
+            displayName: 'Instalar dependencias del frontend'
+            workingDirectory: frontend
+
+          - script: npm run prisma:generate
+            displayName: 'Generar cliente Prisma'
+            workingDirectory: backend
+
+          - script: npm run build
+            displayName: 'Compilar backend'
+            workingDirectory: backend
+
+          - script: npm test
+            displayName: 'Ejecutar pruebas automatizadas'
+            workingDirectory: backend
+
+          - script: npm run build
+            displayName: 'Compilar frontend'
+            workingDirectory: frontend
+
+          - script: npm audit --audit-level=high
+            displayName: 'Analizar vulnerabilidades de dependencias'
+            workingDirectory: backend
+
+          - script: npm audit --audit-level=high
+            displayName: 'Analizar dependencias del frontend'
+            workingDirectory: frontend
+
+  - stage: Package
+    displayName: 'Empaquetar y publicar'
+    dependsOn: Validate
+    condition: succeeded()
+    jobs:
+      - job: Package
+        displayName: 'Crear artefacto de despliegue'
+        pool:
+          name: Default
+        steps:
+          - checkout: self
+            displayName: 'Checkout para empaquetado'
+
+          - task: NodeTool@0
+            displayName: 'Instalar Node.js $(NODE_VERSION)'
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+
+          - script: npm ci
+            displayName: 'Restaurar dependencias del backend'
+            workingDirectory: backend
+
+          - script: npm ci
+            displayName: 'Restaurar dependencias del frontend'
+            workingDirectory: frontend
+
+          - script: npm run build
+            displayName: 'Construir backend para artefacto'
+            workingDirectory: backend
+
+          - script: npm run build
+            displayName: 'Construir frontend para artefacto'
+            workingDirectory: frontend
+
+          - task: CopyFiles@2
+            displayName: 'Preparar archivos publicables'
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'
+              Contents: |
+                backend/dist/**
+                backend/package.json
+                backend/package-lock.json
+                frontend/dist/**
+                database/**
+                compose.yaml
+                README.md
+              TargetFolder: '$(Build.ArtifactStagingDirectory)/it-incident-hub'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar artefacto'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/it-incident-hub'
+              ArtifactName: '$(artifactName)'
+              publishLocation: 'Container'
