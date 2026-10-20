@@ -16,7 +16,11 @@ export const listIncidentsSchema = z.object({
   query: z.object({
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().positive().max(100).default(20),
-  }),
+    status: z.enum(['NUEVO', 'ASIGNADO', 'EN_PROCESO', 'RESUELTO', 'CERRADO']).optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+    categoryId: z.string().uuid().optional(),
+    technicianId: z.string().uuid().optional(),
+  }).strict(),
 });
 
 export const incidentIdSchema = z.object({

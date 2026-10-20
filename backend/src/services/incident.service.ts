@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { IncidentStatus } from '@prisma/client';
+import { IncidentStatus, type Prisma } from '@prisma/client';
 import { AppError } from '../errors/app-error.js';
 import type {
   CreateIncidentInput,
@@ -52,14 +52,21 @@ export async function createIncident(input: CreateIncidentInput) {
 
 export async function listIncidents(input: ListIncidentsInput) {
   const skip = (input.page - 1) * input.limit;
+  const where: Prisma.IncidentWhereInput = {
+    ...(input.status ? { status: input.status } : {}),
+    ...(input.priority ? { priority: input.priority } : {}),
+    ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+    ...(input.technicianId ? { technicianId: input.technicianId } : {}),
+  };
   const [items, total] = await prisma.$transaction([
     prisma.incident.findMany({
+      where,
       skip,
       take: input.limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       include: incidentSummaryInclude,
     }),
-    prisma.incident.count(),
+    prisma.incident.count({ where }),
   ]);
 
   return {
