@@ -21,7 +21,7 @@ export type IncidentComment = {
   author: { id: string; name: string; role: string };
 };
 
-export type User = { id: string; name: string; role: string };
+export type User = { id: string; name: string; role: 'REQUESTER' | 'TECHNICIAN' | 'ADMIN' };
 
 export type IncidentFilters = {
   status?: Incident['status'];
@@ -34,6 +34,7 @@ export type Pagination = { page: number; limit: number; total: number; totalPage
 export type Catalogs = {
   categories: { id: string; name: string }[];
   technicians: { id: string; name: string }[];
+  users: User[];
 };
 
 export type IncidentMetrics = {
@@ -107,8 +108,51 @@ export async function postComment(incidentId: string, authorId: string, content:
   return result.data;
 }
 
-export const demoUsers: User[] = [
-  { id: '00000000-0000-4000-8000-000000000001', name: 'Usuario Solicitante', role: 'REQUESTER' },
-  { id: '00000000-0000-4000-8000-000000000002', name: 'Técnico de Soporte', role: 'TECHNICIAN' },
-  { id: '00000000-0000-4000-8000-000000000003', name: 'Administrador', role: 'ADMIN' },
-];
+export type IncidentHistory = {
+  id: string;
+  eventType: 'CREATED' | 'ASSIGNED' | 'STATUS_CHANGED' | 'COMMENTED' | 'UPDATED';
+  previousStatus: Incident['status'] | null;
+  newStatus: Incident['status'] | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+  actor: User | null;
+};
+
+export type NewIncident = Pick<Incident, 'title' | 'description' | 'priority'> & {
+  categoryId: string; reporterId: string;
+};
+
+export async function fetchIncident(id: string, signal?: AbortSignal) {
+  const result = await request<{ data: Incident }>(`/incidents/${encodeURIComponent(id)}`, { signal });
+  return result.data;
+}
+
+export async function createIncident(input: NewIncident) {
+  const result = await request<{ data: Incident }>('/incidents', { method: 'POST', body: JSON.stringify(input) });
+  return result.data;
+}
+
+export async function assignTechnician(id: string, technicianId: string, actorId: string) {
+  const result = await request<{ data: Incident }>(`/incidents/${encodeURIComponent(id)}/assignment`, {
+    method: 'PATCH', body: JSON.stringify({ technicianId, actorId }),
+  });
+  return result.data;
+}
+
+export async function changeStatus(id: string, status: Incident['status'], actorId: string, reason?: string) {
+  const result = await request<{ data: Incident }>(`/incidents/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH', body: JSON.stringify({ status, actorId, ...(reason ? { reason } : {}) }),
+  });
+  return result.data;
+}
+
+export async function fetchHistory(id: string, signal?: AbortSignal) {
+  const result = await request<{ data: IncidentHistory[] }>(`/incidents/${encodeURIComponent(id)}/history`, { signal });
+  return result.data;
+}
+
+export function fetchCommentsPage(id: string, page: number, signal?: AbortSignal) {
+  return request<{ data: IncidentComment[]; meta: Pagination }>(
+    `/incidents/${encodeURIComponent(id)}/comments?page=${page}&limit=20`, { signal },
+  );
+}

@@ -61,6 +61,10 @@ stages:
             displayName: 'Compilar frontend'
             workingDirectory: frontend
 
+          - script: npm test
+            displayName: 'Probar operaciones del frontend'
+            workingDirectory: frontend
+
           - script: npm audit --audit-level=high
             displayName: 'Analizar vulnerabilidades de dependencias'
             workingDirectory: backend

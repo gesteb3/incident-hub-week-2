@@ -1,30 +1,17 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { fetchCatalogs, type Catalogs, type IncidentFilters } from './api';
+import { useState, type FormEvent } from 'react';
+import type { Catalogs, IncidentFilters } from './api';
 
 type Props = {
   disabled: boolean;
   onApply: (filters: IncidentFilters) => void;
+  catalogs: Catalogs;
+  loading: boolean;
+  error: string;
+  retry: () => void;
 };
 
-export default function IncidentFiltersForm({ disabled, onApply }: Props) {
+export default function IncidentFiltersForm({ disabled, onApply, catalogs, loading, error, retry }: Props) {
   const [filters, setFilters] = useState<IncidentFilters>({});
-  const [catalogs, setCatalogs] = useState<Catalogs>({ categories: [], technicians: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [retry, setRetry] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError('');
-    fetchCatalogs(controller.signal)
-      .then((data) => { if (!controller.signal.aborted) setCatalogs(data); })
-      .catch(() => {
-        if (!controller.signal.aborted) setError('No se pudieron cargar categorías y técnicos.');
-      })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [retry]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +66,7 @@ export default function IncidentFiltersForm({ disabled, onApply }: Props) {
           onApply({});
         }}>Limpiar</button>
       </div>
-      {error && <div className="catalog-error" role="alert">{error} <button type="button" disabled={disabled} onClick={() => setRetry((value) => value + 1)}>Reintentar</button></div>}
+      {error && <div className="catalog-error" role="alert">{error} <button type="button" disabled={disabled} onClick={retry}>Reintentar</button></div>}
     </form>
   );
 }
