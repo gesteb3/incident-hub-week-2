@@ -50,6 +50,13 @@ stages:
             displayName: 'Ejecutar pruebas automatizadas'
             workingDirectory: backend
 
+          - script: |
+              if not exist devops\artifact-manifest.txt (
+                echo ##vso[task.logissue type=error]No se encontro el manifiesto requerido para el artefacto de despliegue.
+                exit /b 1
+              )
+            displayName: 'Validar manifiesto de artefacto'
+
           - script: npm run build
             displayName: 'Compilar frontend'
             workingDirectory: frontend
@@ -109,6 +116,7 @@ stages:
                 backend/package.json
                 backend/package-lock.json
                 frontend/dist/**
+                devops/artifact-manifest.txt
                 database/**
                 compose.yaml
                 README.md

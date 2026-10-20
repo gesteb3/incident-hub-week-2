@@ -1,0 +1,11 @@
+# IT Incident Hub - contenido del artefacto de despliegue
+# Este manifiesto permite revisar los componentes que forman cada entrega.
+
+backend/dist/
+backend/package.json
+backend/package-lock.json
+frontend/dist/
+database/migrations/
+database/seeds/
+compose.yaml
+README.md
