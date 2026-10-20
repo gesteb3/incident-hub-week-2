@@ -120,6 +120,76 @@ describe('GET /api/incidents', () => {
     expect(response.body.data).toEqual(incident);
   });
 
+  it.each([
+    ['status', 'EN_PROCESO'],
+    ['priority', 'CRITICAL'],
+    ['categoryId', '00000000-0000-4000-8000-000000000001'],
+    ['technicianId', '00000000-0000-4000-8000-000000000002'],
+  ])('filtra individualmente por %s y aplica el filtro al total', async (key, value) => {
+    prismaMock.incident.findMany.mockResolvedValue([]);
+    prismaMock.incident.count.mockResolvedValue(0);
+
+    const response = await request(app).get('/api/incidents').query({ [key]: value });
+
+    expect(response.status).toBe(200);
+    expect(prismaMock.incident.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { [key]: value } }),
+    );
+    expect(prismaMock.incident.count).toHaveBeenCalledWith({ where: { [key]: value } });
+    expect(response.body).toEqual({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+  });
+
+  it('combina los cuatro filtros y conserva la paginación', async () => {
+    const filters = {
+      status: 'ASIGNADO',
+      priority: 'HIGH',
+      categoryId: randomUUID(),
+      technicianId: randomUUID(),
+    };
+    const incidents = [{ id: randomUUID(), ...filters }];
+    prismaMock.incident.findMany.mockResolvedValue(incidents);
+    prismaMock.incident.count.mockResolvedValue(12);
+
+    const response = await request(app)
+      .get('/api/incidents')
+      .query({ ...filters, page: 2, limit: 5 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(incidents);
+    expect(response.body.meta).toEqual({ page: 2, limit: 5, total: 12, totalPages: 3 });
+    expect(prismaMock.incident.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: filters,
+        skip: 5,
+        take: 5,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+    expect(prismaMock.incident.count).toHaveBeenCalledWith({ where: filters });
+  });
+
+  it.each([
+    { status: 'ABIERTO' },
+    { priority: 'URGENTE' },
+    { categoryId: 'no-es-uuid' },
+    { technicianId: 'no-es-uuid' },
+    { status: '' },
+    { status: ['NUEVO', 'CERRADO'] },
+    { category: 'Red' },
+    { page: 0 },
+    { limit: 101 },
+  ])('rechaza parámetros inválidos antes de consultar: %j', async (query) => {
+    const response = await request(app).get('/api/incidents').query(query);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prismaMock.incident.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.incident.count).not.toHaveBeenCalled();
+  });
+
   it('responde 404 cuando el incidente no existe', async () => {
     prismaMock.incident.findUnique.mockResolvedValue(null);
 
