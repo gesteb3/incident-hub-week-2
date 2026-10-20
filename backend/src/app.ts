@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { incidentRouter } from './routes/incident.routes.js';
+import { prisma } from './lib/prisma.js';
 
 export const app = express();
 
@@ -17,4 +18,23 @@ app.get('/health', (_request, response) => {
 });
 
 app.use('/api/incidents', incidentRouter);
+app.get('/api/catalogs', async (_request, response, next) => {
+  try {
+    const [categories, technicians] = await Promise.all([
+      prisma.category.findMany({
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.user.findMany({
+        where: { active: true, role: { in: ['TECHNICIAN', 'ADMIN'] } },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    response.json({ data: { categories, technicians } });
+  } catch (error) {
+    next(error);
+  }
+});
 app.use(errorHandler);

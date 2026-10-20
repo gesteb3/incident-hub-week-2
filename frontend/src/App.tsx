@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import IncidentFiltersForm from './IncidentFiltersForm';
 import {
   demoUsers,
   fetchComments,
@@ -6,6 +7,8 @@ import {
   postComment,
   type Incident,
   type IncidentComment,
+  type IncidentFilters,
+  type Pagination,
 } from './api';
 
 const statusLabels: Record<Incident['status'], string> = {
@@ -40,52 +43,59 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [listError, setListError] = useState('');
+  const [query, setQuery] = useState<IncidentFilters & { page: number; limit: number }>({ page: 1, limit: 10 });
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [listReload, setListReload] = useState(0);
+  const [commentReload, setCommentReload] = useState(0);
+  const hasFilters = !!(query.status || query.priority || query.categoryId || query.technicianId);
 
   const selectedIncident = useMemo(
     () => incidents.find((incident) => incident.id === selectedId),
     [incidents, selectedId],
   );
 
-  const loadComments = useCallback(async (incidentId: string) => {
-    setLoadingComments(true);
-    setError('');
-    try {
-      setComments(await fetchComments(incidentId));
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los comentarios.');
-      setComments([]);
-    } finally {
-      setLoadingComments(false);
-    }
-  }, []);
-
   useEffect(() => {
-    let active = true;
-    fetchIncidents()
-      .then((items) => {
-        if (!active) return;
-        setIncidents(items);
-        const initialId = items.some((incident) => incident.id === requestedIncidentId)
-          ? requestedIncidentId!
-          : items[0]?.id ?? '';
-        setSelectedId(initialId);
+    const controller = new AbortController();
+    setLoadingIncidents(true);
+    setListError('');
+    fetchIncidents(query, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setIncidents(result.data);
+        setPagination(result.meta);
+        setSelectedId((current) => result.data.some((incident) => incident.id === current)
+          ? current : result.data[0]?.id ?? '');
       })
       .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los incidentes.');
+        if (!controller.signal.aborted) {
+          setListError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los incidentes.');
+          setIncidents([]);
+          setSelectedId('');
+        }
       })
       .finally(() => {
-        if (active) setLoadingIncidents(false);
+        if (!controller.signal.aborted) setLoadingIncidents(false);
       });
-
-    return () => {
-      active = false;
-    };
-  }, [requestedIncidentId]);
+    return () => controller.abort();
+  }, [query, listReload]);
 
   useEffect(() => {
-    if (selectedId) void loadComments(selectedId);
-    else setComments([]);
-  }, [selectedId, loadComments]);
+    const controller = new AbortController();
+    setComments([]);
+    setError('');
+    if (!selectedId) { setLoadingComments(false); return; }
+    setLoadingComments(true);
+    fetchComments(selectedId, controller.signal)
+      .then((items) => { if (!controller.signal.aborted) setComments(items); })
+      .catch((loadError: unknown) => {
+        if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los comentarios.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoadingComments(false); });
+    return () => controller.abort();
+  }, [selectedId, commentReload]);
+
+  useEffect(() => { setContent(''); setNotice(''); }, [selectedId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,8 +107,8 @@ export default function App() {
     try {
       await postComment(selectedId, authorId, content.trim());
       setContent('');
-      setNotice('Comentario agregado y registrado en la bitácora del incidente.');
-      await loadComments(selectedId);
+      setNotice('Comentario guardado.');
+      setCommentReload((value) => value + 1);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'No se pudo guardar el comentario.');
     } finally {
@@ -122,10 +132,15 @@ export default function App() {
           <div>
             <p className="eyebrow">OPERACIONES · SEGUIMIENTO</p>
             <h1>Incidentes de TI</h1>
-            <p className="subtitle">Mantén cada conversación y decisión junto al incidente.</p>
+            <p className="subtitle">Consulta los reportes y el avance de su atención.</p>
           </div>
-          <div className="live-indicator"><span /> API conectada</div>
+          <div className={`live-indicator ${listError ? 'connection-error' : ''}`} role="status"><span /> {loadingIncidents ? 'Actualizando…' : listError ? 'Sin actualizar' : 'Datos actualizados'}</div>
         </section>
+
+        <IncidentFiltersForm disabled={loadingIncidents || sending} onApply={(filters) => {
+          setQuery({ ...filters, page: 1, limit: query.limit });
+          setNotice('');
+        }} />
 
         <section className="content-grid">
           <aside className="incident-panel panel">
@@ -134,13 +149,15 @@ export default function App() {
                 <p className="eyebrow">Bandeja de trabajo</p>
                 <h2>Incidentes</h2>
               </div>
-              <span className="count-pill">{incidents.length}</span>
+              <span className="count-pill" aria-label="Total de incidentes">{loadingIncidents || listError ? '—' : pagination.total}</span>
             </div>
 
             {loadingIncidents ? (
               <p className="muted-state">Cargando incidentes…</p>
+            ) : listError ? (
+              <div className="feedback feedback-error" role="alert"><strong>No se pudieron cargar los incidentes</strong><span>{listError}</span><button type="button" onClick={() => setListReload((value) => value + 1)}>Reintentar</button></div>
             ) : incidents.length === 0 ? (
-              <div className="empty-state compact"><span className="empty-icon">◇</span><strong>No hay incidentes</strong><span>Cuando se registre uno, aparecerá aquí.</span></div>
+              <div className="empty-state compact"><span className="empty-icon">◇</span><strong>{hasFilters ? 'No hay coincidencias' : 'No hay incidentes'}</strong><span>{hasFilters ? 'Prueba otros filtros o pulsa Limpiar.' : 'Los reportes registrados aparecerán aquí.'}</span></div>
             ) : (
               <div className="incident-list" role="listbox" aria-label="Seleccionar incidente">
                 {incidents.map((incident) => (
@@ -151,6 +168,7 @@ export default function App() {
                     onClick={() => { setSelectedId(incident.id); setNotice(''); }}
                     role="option"
                     type="button"
+                    disabled={sending}
                   >
                     <span className={`priority-dot priority-${incident.priority.toLowerCase()}`} />
                     <span className="incident-card-copy">
@@ -162,10 +180,23 @@ export default function App() {
                 ))}
               </div>
             )}
+            <nav className="pagination" aria-label="Páginas de incidentes">
+              <div className="pagination-size"><label htmlFor="page-size">Por página</label><select id="page-size" value={query.limit} disabled={loadingIncidents || sending}
+                onChange={(event) => setQuery({ ...query, page: 1, limit: Number(event.target.value) })}>
+                <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
+              </select></div>
+              <span aria-live="polite">{loadingIncidents ? 'Cargando…' : listError ? '—' : pagination.total === 0 ? '0 resultados' : `Página ${pagination.page} de ${pagination.totalPages}`}</span>
+              <div className="pagination-buttons">
+                <button className="secondary-button" type="button" aria-label="Página anterior" disabled={loadingIncidents || sending || !!listError || query.page <= 1}
+                  onClick={() => setQuery({ ...query, page: query.page - 1 })}>Anterior</button>
+                <button className="secondary-button" type="button" aria-label="Página siguiente" disabled={loadingIncidents || sending || !!listError || query.page >= pagination.totalPages}
+                  onClick={() => setQuery({ ...query, page: query.page + 1 })}>Siguiente</button>
+              </div>
+            </nav>
           </aside>
 
           <section className="detail-column">
-            {selectedIncident ? (
+            {!loadingIncidents && selectedIncident ? (
               <>
                 <article className="incident-summary panel">
                   <div className="summary-topline">
@@ -195,7 +226,7 @@ export default function App() {
                     {loadingComments ? (
                       <p className="muted-state">Cargando seguimiento…</p>
                     ) : comments.length === 0 ? (
-                      <div className="empty-state"><span className="empty-icon">✳</span><strong>Inicia el seguimiento</strong><span>Agrega una nota para que el equipo tenga el contexto completo.</span></div>
+                      <div className="empty-state"><span className="empty-icon">✳</span><strong>Sin comentarios</strong><span>Registra una nota sobre la atención del incidente.</span></div>
                     ) : comments.map((comment) => (
                       <article className="comment" key={comment.id}>
                         <div className="comment-avatar">{comment.author.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</div>
@@ -217,7 +248,7 @@ export default function App() {
                       id="comment-content"
                       maxLength={2000}
                       onChange={(event) => setContent(event.target.value)}
-                      placeholder="Comparte una actualización, hallazgo o siguiente paso…"
+                      placeholder="Escribe una nota de seguimiento…"
                       required
                       rows={3}
                       value={content}
@@ -235,11 +266,11 @@ export default function App() {
             ) : (
               <div className="panel empty-detail"><span className="empty-icon">◇</span><strong>{loadingIncidents ? 'Preparando bandeja…' : 'Selecciona un incidente'}</strong><span>El detalle y el seguimiento aparecerán aquí.</span></div>
             )}
-            {error && <div className="feedback feedback-error" role="alert"><strong>No se pudo completar la acción</strong><span>{error}</span><button onClick={() => selectedId && void loadComments(selectedId)} type="button">Reintentar</button></div>}
+            {error && <div className="feedback feedback-error" role="alert"><strong>No se pudo completar la acción</strong><span>{error}</span><button disabled={sending} onClick={() => setCommentReload((value) => value + 1)} type="button">Recargar comentarios</button></div>}
             {notice && <div className="feedback feedback-success" role="status"><span className="success-mark">✓</span><span>{notice}</span><button aria-label="Cerrar aviso" onClick={() => setNotice('')} type="button">×</button></div>}
           </section>
         </section>
-        <footer className="page-footer"><span>IT Incident Hub</span><span>Seguimiento trazable · PostgreSQL</span></footer>
+        <footer className="page-footer"><span>IT Incident Hub</span><span>Mesa de ayuda · Gestión de incidentes</span></footer>
       </main>
     </div>
   );
