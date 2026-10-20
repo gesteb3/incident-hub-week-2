@@ -31,3 +31,19 @@ si todavía tienen incidentes asociados.
 Una base sin incidentes devuelve HTTP 200, indicadores en cero, los cinco estados
 en cero y distribuciones vacías. Los errores de base de datos devuelven el error
 general de la API sin exponer consultas ni credenciales.
+
+## Dashboard
+
+La vista `http://localhost:5173/?view=dashboard` consume este endpoint mediante
+la sección **Indicadores**. Presenta cuatro tarjetas, una gráfica circular por
+estado, barras por categoría y distribución por responsable. Cada gráfica
+incluye etiquetas y valores numéricos; los colores complementan la información.
+
+Las tarjetas usan verde oscuro para el total, verde claro para abiertos, azul
+para cerrados y ámbar para críticos pendientes. No se presentan tendencias
+temporales porque el endpoint no proporciona una serie histórica.
+
+El botón **Actualizar** solicita un nuevo cálculo y muestra la hora recibida en
+`generatedAt`. Si falla una actualización, se conservan los últimos datos con
+una advertencia visible. Un fallo en la carga inicial muestra el error y un
+botón para reintentar, sin presentar ceros como resultados válidos.
