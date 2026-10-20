@@ -40,7 +40,18 @@ npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173`. La interfaz obtiene incidentes y comentarios desde la API; los comentarios nuevos también quedan en la bitácora.
+Abre `http://localhost:5173`. Puedes registrar incidentes, asignar responsables,
+iniciar su atención, resolverlos y cerrarlos con un motivo. El detalle incluye
+comentarios paginados e historial de cambios. Los indicadores están en
+`http://localhost:5173/?view=dashboard`.
+
+El selector **Trabajar como** usa los usuarios activos de la base de datos para
+la demostración local. La autenticación está registrada como deuda pendiente.
+
+Desde `frontend/`, ejecuta `npm test` para las pruebas de componentes y
+`npm run build` para validar la compilación de producción.
+
+- [Uso y validación de la operación web](docs/qa-operacion-frontend.md)
 
 ## Trazabilidad
 

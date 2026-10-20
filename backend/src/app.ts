@@ -20,7 +20,7 @@ app.get('/health', (_request, response) => {
 app.use('/api/incidents', incidentRouter);
 app.get('/api/catalogs', async (_request, response, next) => {
   try {
-    const [categories, technicians] = await Promise.all([
+    const [categories, technicians, users] = await Promise.all([
       prisma.category.findMany({
         where: { active: true },
         select: { id: true, name: true },
@@ -31,8 +31,13 @@ app.get('/api/catalogs', async (_request, response, next) => {
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
       }),
+      prisma.user.findMany({
+        where: { active: true },
+        select: { id: true, name: true, role: true },
+        orderBy: { name: 'asc' },
+      }),
     ]);
-    response.json({ data: { categories, technicians } });
+    response.json({ data: { categories, technicians, users } });
   } catch (error) {
     next(error);
   }

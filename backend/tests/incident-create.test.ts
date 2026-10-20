@@ -32,18 +32,22 @@ describe('GET /api/catalogs', () => {
     const categories = [{ id: randomUUID(), name: 'Redes' }];
     const technicians = [{ id: randomUUID(), name: 'Técnico de Soporte' }];
     prismaMock.category.findMany.mockResolvedValue(categories);
-    prismaMock.user.findMany.mockResolvedValue(technicians);
+    const users = [{ id: randomUUID(), name: 'Solicitante', role: 'REQUESTER' }];
+    prismaMock.user.findMany.mockResolvedValueOnce(technicians).mockResolvedValueOnce(users);
 
     const response = await request(app).get('/api/catalogs');
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ categories, technicians });
+    expect(response.body.data).toEqual({ categories, technicians, users });
     expect(prismaMock.category.findMany).toHaveBeenCalledWith({
       where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' },
     });
     expect(prismaMock.user.findMany).toHaveBeenCalledWith({
       where: { active: true, role: { in: ['TECHNICIAN', 'ADMIN'] } },
       select: { id: true, name: true }, orderBy: { name: 'asc' },
+    });
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+      where: { active: true }, select: { id: true, name: true, role: true }, orderBy: { name: 'asc' },
     });
   });
 });
