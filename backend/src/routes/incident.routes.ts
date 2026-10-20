@@ -8,11 +8,13 @@ import {
   listIncidentsController,
   createIncidentCommentController,
   listIncidentCommentsController,
+  getIncidentMetricsController,
 } from '../controllers/incident.controller.js';
 
 export const incidentRouter = Router();
 
 incidentRouter.get('/', listIncidentsController);
+incidentRouter.get('/metrics', getIncidentMetricsController);
 incidentRouter.get('/:id/history', getIncidentHistoryController);
 incidentRouter.get('/:id/comments', listIncidentCommentsController);
 incidentRouter.post('/:id/comments', createIncidentCommentController);
