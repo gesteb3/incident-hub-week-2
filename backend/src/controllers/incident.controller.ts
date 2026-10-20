@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { getIncidentMetrics } from '../services/metrics.service.js';
 import {
   createIncidentSchema,
   assignTechnicianSchema,
@@ -29,6 +30,19 @@ export async function createIncidentController(
     const incident = await createIncident(body);
 
     response.status(201).json({ data: incident });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getIncidentMetricsController(
+  _request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  try {
+    const metrics = await getIncidentMetrics();
+    response.set('Cache-Control', 'no-store').json({ data: metrics });
   } catch (error) {
     next(error);
   }
