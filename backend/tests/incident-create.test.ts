@@ -3,8 +3,8 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMock = vi.hoisted(() => ({
-  user: { findFirst: vi.fn() },
-  category: { findFirst: vi.fn() },
+  user: { findFirst: vi.fn(), findMany: vi.fn() },
+  category: { findFirst: vi.fn(), findMany: vi.fn() },
   incident: {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -24,6 +24,29 @@ process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 
 const { app } = await import('../src/app.js');
+
+describe('GET /api/catalogs', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('consulta categorías activas y técnicos elegibles sin exponer correos', async () => {
+    const categories = [{ id: randomUUID(), name: 'Redes' }];
+    const technicians = [{ id: randomUUID(), name: 'Técnico de Soporte' }];
+    prismaMock.category.findMany.mockResolvedValue(categories);
+    prismaMock.user.findMany.mockResolvedValue(technicians);
+
+    const response = await request(app).get('/api/catalogs');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ categories, technicians });
+    expect(prismaMock.category.findMany).toHaveBeenCalledWith({
+      where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' },
+    });
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+      where: { active: true, role: { in: ['TECHNICIAN', 'ADMIN'] } },
+      select: { id: true, name: true }, orderBy: { name: 'asc' },
+    });
+  });
+});
 
 describe('POST /api/incidents', () => {
   beforeEach(() => {

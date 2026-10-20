@@ -36,3 +36,20 @@ Las pruebas HTTP verifican cada filtro individual, la combinación de los cuatro
 el conteo filtrado, la paginación y el rechazo de valores inválidos antes de
 consultar la base de datos. Las consultas se realizan mediante Prisma, sin
 concatenar SQL con entradas del usuario.
+
+## Interfaz de consulta
+
+La pantalla principal combina los cuatro filtros mediante **Aplicar filtros**.
+**Limpiar** elimina los criterios y vuelve a la primera página. La navegación
+**Anterior/Siguiente** conserva los filtros; cambiar el tamaño de página vuelve
+a la primera página. Los botones se deshabilitan durante la consulta y en los
+límites de la paginación.
+
+`GET /api/catalogs` devuelve categorías activas y técnicos activos con rol
+TECHNICIAN o ADMIN; solamente expone sus identificadores y nombres. Los
+selectores consultan este catálogo completo, incluso cuando un criterio no
+produce coincidencias.
+
+Las solicitudes anteriores se cancelan al cambiar de consulta o incidente. Un
+fallo al cargar incidentes muestra un error con reintento; una respuesta vacía
+muestra **No hay coincidencias** y permite limpiar los filtros.

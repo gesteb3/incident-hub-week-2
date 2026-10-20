@@ -26,6 +26,9 @@ docker compose up -d database
 
 La migración y los datos iniciales se aplican automáticamente al crear el volumen por primera vez.
 
+Si otro proyecto utiliza el puerto 5432, configura `POSTGRES_PORT=5435` en `.env`
+y usa ese mismo puerto en `DATABASE_URL`. Después ejecuta `docker compose up -d database`.
+
 ## Interfaz web local
 
 Con la API disponible en `http://localhost:3000`, inicia la interfaz en otra terminal:
