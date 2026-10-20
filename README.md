@@ -4,7 +4,7 @@ Sistema web trazable para registrar, operar y dar seguimiento a incidentes de TI
 
 ## Estado
 
-Semana 1 - modelo de datos y módulos funcionales iniciales.
+Semana 2 - integración continua, calidad y seguridad en progreso.
 
 ## Arquitectura
 
@@ -42,3 +42,10 @@ Abre `http://localhost:5173`. La interfaz obtiene incidentes y comentarios desde
 ## Trazabilidad
 
 El trabajo se realiza en ramas `feature/*`, `fix/*` o `refactor/*`. Los commits y Pull Requests deben incluir el identificador de Azure Boards con la sintaxis `AB#ID`.
+
+## Calidad y seguridad
+
+- [Análisis de dependencias](docs/dependencies.md)
+- [Controles de seguridad](docs/security.md)
+- [Registro de deuda técnica](docs/technical-debt.md)
+- [Validación con GitHub Actions](docs/github-actions.md)
