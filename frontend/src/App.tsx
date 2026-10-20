@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import IncidentFiltersForm from './IncidentFiltersForm';
+import Dashboard from './Dashboard';
 import {
   demoUsers,
   fetchComments,
@@ -32,6 +33,7 @@ const dateFormatter = new Intl.DateTimeFormat('es-GT', {
 });
 
 export default function App() {
+  const isDashboard = new URLSearchParams(window.location.search).get('view') === 'dashboard';
   const requestedIncidentId = new URLSearchParams(window.location.search).get('incidentId');
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedId, setSelectedId] = useState(requestedIncidentId ?? '');
@@ -56,6 +58,7 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (isDashboard) { setLoadingIncidents(false); return; }
     const controller = new AbortController();
     setLoadingIncidents(true);
     setListError('');
@@ -78,7 +81,7 @@ export default function App() {
         if (!controller.signal.aborted) setLoadingIncidents(false);
       });
     return () => controller.abort();
-  }, [query, listReload]);
+  }, [query, listReload, isDashboard]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -124,10 +127,16 @@ export default function App() {
           <span>IT Incident Hub</span>
         </a>
         <span className="topbar-label">Centro de soporte</span>
+        <nav className="view-nav" aria-label="Secciones">
+          <a href="/" aria-current={!isDashboard ? 'page' : undefined}>Incidentes</a>
+          <a href="/?view=dashboard" aria-current={isDashboard ? 'page' : undefined}>Indicadores</a>
+        </nav>
         <span className="avatar" title="Usuario activo">GB</span>
       </header>
 
       <main className="workspace">
+        {isDashboard && <Dashboard />}
+        {!isDashboard && <div>
         <section className="page-heading">
           <div>
             <p className="eyebrow">OPERACIONES · SEGUIMIENTO</p>
@@ -270,6 +279,7 @@ export default function App() {
             {notice && <div className="feedback feedback-success" role="status"><span className="success-mark">✓</span><span>{notice}</span><button aria-label="Cerrar aviso" onClick={() => setNotice('')} type="button">×</button></div>}
           </section>
         </section>
+        </div>}
         <footer className="page-footer"><span>IT Incident Hub</span><span>Mesa de ayuda · Gestión de incidentes</span></footer>
       </main>
     </div>

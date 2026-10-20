@@ -36,6 +36,23 @@ export type Catalogs = {
   technicians: { id: string; name: string }[];
 };
 
+export type IncidentMetrics = {
+  total: number;
+  open: number;
+  resolved: number;
+  closed: number;
+  critical: number;
+  byStatus: { status: Incident['status']; count: number }[];
+  byCategory: { categoryId: string; name: string; count: number }[];
+  byTechnician: { technicianId: string | null; name: string; count: number }[];
+  generatedAt: string;
+};
+
+export async function fetchMetrics(signal?: AbortSignal) {
+  const result = await request<{ data: IncidentMetrics }>('/incidents/metrics', { signal });
+  return result.data;
+}
+
 type ApiErrorBody = { error?: { message?: string } };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
